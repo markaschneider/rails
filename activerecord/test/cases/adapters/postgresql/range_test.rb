@@ -130,8 +130,8 @@ class PostgresqlRangeTest < ActiveRecord::PostgreSQLTestCase
   def test_daterange_values
     assert_equal Date.new(2012, 1, 2)...Date.new(2012, 1, 5), @first_range.date_range
     assert_equal Date.new(2012, 1, 2)...Date.new(2012, 1, 4), @second_range.date_range
-    assert_equal Date.new(2012, 1, 2)...Float::INFINITY, @third_range.date_range
-    assert_equal(-Float::INFINITY...Float::INFINITY, @fourth_range.date_range)
+    assert_equal Date.new(2012, 1, 2)...nil, @third_range.date_range
+    assert_equal(nil...nil, @fourth_range.date_range)
     assert_nil @empty_range.date_range
   end
 
@@ -148,7 +148,7 @@ class PostgresqlRangeTest < ActiveRecord::PostgreSQLTestCase
     assert_equal Time.public_send(tz, 2010, 1, 1, 14, 30, 0)..Time.public_send(tz, 2011, 1, 1, 14, 30, 0), @first_range.ts_range
     assert_equal Time.public_send(tz, 2010, 1, 1, 14, 30, 0)...Time.public_send(tz, 2011, 1, 1, 14, 30, 0), @second_range.ts_range
     assert_equal Time.public_send(tz, 2010, 1, 1, 14, 30, 0)...nil, @third_range.ts_range
-    assert_equal(-Float::INFINITY...Float::INFINITY, @fourth_range.ts_range)
+    assert_equal(nil...nil, @fourth_range.ts_range)
     assert_nil @empty_range.ts_range
   end
 
@@ -156,7 +156,7 @@ class PostgresqlRangeTest < ActiveRecord::PostgreSQLTestCase
     assert_equal Time.parse("2010-01-01 09:30:00 UTC")..Time.parse("2011-01-01 17:30:00 UTC"), @first_range.tstz_range
     assert_equal Time.parse("2010-01-01 09:30:00 UTC")...Time.parse("2011-01-01 17:30:00 UTC"), @second_range.tstz_range
     assert_equal Time.parse("2010-01-01 09:30:00 UTC")...nil, @third_range.tstz_range
-    assert_equal(-Float::INFINITY...Float::INFINITY, @fourth_range.tstz_range)
+    assert_equal(nil...nil, @fourth_range.tstz_range)
     assert_nil @empty_range.tstz_range
   end
 
@@ -554,7 +554,9 @@ class PostgresqlRangeTest < ActiveRecord::PostgreSQLTestCase
     record = PostgresqlRange.create!(
       int4_range: 1..,
       int8_range: 10..,
-      float_range: 0.5..
+      float_range: 0.5..,
+      date_range: Date.new(2012, 1, 1)..,
+      ts_range: Time.new(2010, 1, 1, 14, 30, 0)..
     )
 
     record = PostgresqlRange.find(record.id)
@@ -562,6 +564,26 @@ class PostgresqlRangeTest < ActiveRecord::PostgreSQLTestCase
     assert_equal 1...Float::INFINITY, record.int4_range
     assert_equal 10...Float::INFINITY, record.int8_range
     assert_equal 0.5...Float::INFINITY, record.float_range
+    assert_equal Date.new(2012, 1, 1)...nil, record.date_range
+    assert_equal Time.new(2010, 1, 1, 14, 30, 0)...nil, record.ts_range
+  end
+
+  def test_beginless_range_values
+    record = PostgresqlRange.create!(
+      int4_range: ..10,
+      int8_range: ..100,
+      float_range: ..0.7,
+      date_range: ..Date.new(2012, 1, 4),
+      ts_range: ..Time.new(2011, 1, 1, 14, 30, 0)
+    )
+
+    record = PostgresqlRange.find(record.id)
+
+    assert_equal(-Float::INFINITY...11, record.int4_range)
+    assert_equal(-Float::INFINITY...101, record.int8_range)
+    assert_equal(-Float::INFINITY...0.7, record.float_range)
+    assert_equal(nil...Date.new(2012, 1, 5), record.date_range)
+    assert_equal(nil...Time.new(2011, 1, 1, 14, 30, 0), record.ts_range)
   end
 
   def test_empty_string_range_values
