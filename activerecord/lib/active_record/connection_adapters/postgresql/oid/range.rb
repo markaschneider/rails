@@ -79,10 +79,19 @@ module ActiveRecord
             INFINITE_FLOAT_RANGE = (-::Float::INFINITY)..(::Float::INFINITY) # :nodoc:
 
             def sanitize_bounds(from, to)
-              [
-                (from == -::Float::INFINITY && !INFINITE_FLOAT_RANGE.cover?(to)) ? nil : from,
-                (to == ::Float::INFINITY && !INFINITE_FLOAT_RANGE.cover?(from)) ? nil : to
-              ]
+              # For temporal types (Time, Date, DateTime), always use nil for infinity bounds
+              # to avoid type mixing issues and ensure proper #cover? behavior
+              if temporal_subtype?
+                [
+                  infinity?(from) ? nil : from,
+                  infinity?(to) ? nil : to
+                ]
+              else
+                [
+                  (from == -::Float::INFINITY && !INFINITE_FLOAT_RANGE.cover?(to)) ? nil : from,
+                  (to == ::Float::INFINITY && !INFINITE_FLOAT_RANGE.cover?(from)) ? nil : to
+                ]
+              end
             end
 
             # When formatting the bound values of range types, PostgreSQL quotes
@@ -116,6 +125,15 @@ module ActiveRecord
 
             def infinity?(value)
               value.respond_to?(:infinite?) && value.infinite?
+            end
+
+            def temporal_subtype?
+              # Check if the subtype is a temporal type (Time, Date, DateTime)
+              @subtype.is_a?(ActiveRecord::Type::Time) ||
+                @subtype.is_a?(ActiveRecord::Type::Date) ||
+                @subtype.is_a?(ActiveRecord::Type::DateTime) ||
+                @subtype.is_a?(ActiveRecord::ConnectionAdapters::PostgreSQL::OID::DateTime) ||
+                @subtype.is_a?(ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Date)
             end
         end
       end
